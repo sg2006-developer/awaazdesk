@@ -18,6 +18,13 @@ from .engine import take_turn
 from .speech import SAMPLE_RATE, RealtimeSTT, RealtimeTTS, SpeechError, recognition_hints
 
 log = logging.getLogger("awaazdesk.live")
+FRAGMENT_HOLD_SECONDS = 1.2
+START_BUFFER_BYTES = SAMPLE_RATE * 2 // 4   # 250 ms of 16 kHz PCM16.   # How long a short utterance waits for the caller to continue.
+
+
+def is_fragment(text, meta):
+    """'Okay.', 'సరే', 'हाँ, तो' — short spoken bits that usually lead into the real request."""
+    return meta is not None and len(text.split()) <= 2 and (meta.get("audio_ms") or 0) < 1500
 
 
 class LiveCall:
@@ -34,6 +41,7 @@ class LiveCall:
         self.speech_ended_at = None
         self.stt_latency = None
         self.voice_ready = False
+        self.speech_started = asyncio.Event()
 
     def _duration(self):
         seconds = int(self.max_seconds or 0)
@@ -137,6 +145,7 @@ class LiveCall:
     async def on_stt_event(self, event):
         kind = event["type"]
         if kind == "speech_start":
+            self.speech_started.set()
             await self.send(type="speech_start")
         elif kind == "partial":
             # Barge-in on real words, not on a cough: wait for a non-empty partial.
@@ -151,6 +160,7 @@ class LiveCall:
             if self.is_speaking() and self.barge_in:
                 await self.interrupt()
             self.stt_latency = event.get("latency_ms")
+            self.speech_started.clear()
             await self.send(type="final", text=event["text"], language=event.get("language"))
             meta = {"stt_ms": event.get("latency_ms"), "audio_ms": event.get("audio_ms")}
             await self.turns.put((event["text"], event.get("language"), meta))
@@ -161,10 +171,7 @@ class LiveCall:
     async def take_turns(self):
         while True:
             text, language, meta = await self.turns.get()
-            # If the caller said several things while we were busy, answer them together.
-            while not self.turns.empty():
-                more, more_language, _ = self.turns.get_nowait()
-                text, language = f"{text} {more}", more_language or language
+            text, language, meta = await self.gather(text, language, meta)
             await self.send(type="thinking")
             try:
                 call = self.store.call(self.call_id)
@@ -183,6 +190,25 @@ class LiveCall:
                 if asyncio.current_task().cancelling():
                     raise
 
+    async def gather(self, text, language, meta):
+        """Merge what the caller said while we were busy, and let short fragments finish.
+
+        Without this, "సరే." + pause + "how often do I change the filter?" becomes two turns,
+        and the agent answers "Okay" on its own.
+        """
+        while True:
+            while not self.turns.empty():
+                more, more_language, more_meta = self.turns.get_nowait()
+                text, language, meta = f"{text} {more}", more_language or language, more_meta
+            if not is_fragment(text, meta):
+                return text, language, meta
+            try:
+                await asyncio.wait_for(self.speech_started.wait(), FRAGMENT_HOLD_SECONDS)
+                more, more_language, more_meta = await asyncio.wait_for(self.turns.get(), 20)
+            except TimeoutError:
+                return text, language, meta
+            text, language, meta = f"{text} {more}", more_language or language, more_meta
+
     # ------------------------------------------------------------ speech out
     def is_speaking(self):
         return self.speaking is not None and not self.speaking.done()
@@ -196,12 +222,24 @@ class LiveCall:
         started = time.perf_counter()
         first_audio = None
         await self.send(type="audio_start", sample_rate=SAMPLE_RATE, language=language)
+        pending = bytearray()
         try:
             async for chunk in self.tts.stream(text, language, config.get("voice")):
-                if first_audio is None:
+                if first_audio is not None:
+                    await self.send_audio(chunk)
+                    continue
+                # Timbre v3.0 sends a ~60 ms chunk, then nothing for ~1 s. Playing it at once
+                # gives a blip and a gap, so hold the start until 250 ms of audio is ready and
+                # measure "first audio" there: that is when the caller really starts hearing.
+                pending.extend(chunk)
+                if len(pending) >= START_BUFFER_BYTES:
                     first_audio = time.perf_counter()
                     await self.send(type="metrics", **self.metrics(started, first_audio, llm_ms))
-                await self.send_audio(chunk)
+                    await self.send_audio(bytes(pending))
+            if first_audio is None and pending:   # A reply shorter than the buffer.
+                first_audio = time.perf_counter()
+                await self.send(type="metrics", **self.metrics(started, first_audio, llm_ms))
+                await self.send_audio(bytes(pending))
         except (SpeechError, HTTPException) as exc:
             await self.send(type="error", message=f"{getattr(exc, 'detail', exc)} The text reply is shown above.")
         finally:

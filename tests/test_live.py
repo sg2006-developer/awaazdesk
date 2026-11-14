@@ -54,6 +54,15 @@ class FakeSTT:
                 await self.queue.put(event)
         elif pcm == b"INTERRUPT":
             await self.queue.put({"type": "partial", "text": "wait wait"})
+        elif pcm in (b"FRAGMENT", b"LONE"):
+            await self.queue.put({"type": "speech_start"})
+            await self.queue.put({"type": "final", "text": "సరే.", "language": "te-IN", "latency_ms": 90, "audio_ms": 700})
+            if pcm == b"FRAGMENT":   # The caller pauses, then carries on.
+                async def carry_on():
+                    await asyncio.sleep(0.3)
+                    await self.queue.put({"type": "speech_start"})
+                    await self.queue.put({"type": "final", "text": "ఫిల్టర్ ఎప్పుడు మార్చాలి?", "language": "te-IN", "latency_ms": 120, "audio_ms": 2100})
+                asyncio.get_running_loop().create_task(carry_on())
 
     async def events(self):
         while True:
@@ -111,7 +120,7 @@ def test_live_call_round_trip(tmp_path, fake_llm):
         with client.websocket_connect(f"/ws/calls/{call['id']}") as ws:
             events = receive_until(ws, "audio_end")
             assert events[0]["type"] == "ready" and events[0]["voice"] is True
-            assert sum(e["type"] == "audio" for e in events) == 3     # Greeting is spoken.
+            assert sum(len(e["bytes"]) for e in events if e["type"] == "audio") == 3 * 640     # Greeting is spoken.
             assert tts.requests[0][0].startswith("Hello! I'm the AI support assistant")
             # Recognition hints come from the published business.
             assert "ClearDrop Care" in FakeSTT.instances[-1].hints["keyterms"]
@@ -127,7 +136,7 @@ def test_live_call_round_trip(tmp_path, fake_llm):
 
             # The spoken form (IDs spelled out) is what Timbre receives, in the reply language.
             text, language, settings = tts.requests[-1]
-            assert "సి డి రెండు" in text and language == "te-IN" and settings["voice"] == "Shivani"
+            assert "సి డి రెండు" in text and language == "te-IN" and settings["model"] == "timbre-v2.5"
             assert fake_llm[-1]["caller_language"] == "te-IN"
 
             ws.send_text('{"type": "end"}')
@@ -149,7 +158,7 @@ def test_caller_can_interrupt_the_agent(tmp_path, fake_llm):
             receive_until(ws, "audio_start")
             ws.send_bytes(b"INTERRUPT")
             events = receive_until(ws, "barge_in")
-            assert sum(e["type"] == "audio" for e in events) < 200
+            assert sum(len(e["bytes"]) for e in events if e["type"] == "audio") < 200 * 640
     store.engine.dispose()
 
 
@@ -255,7 +264,7 @@ def test_tts_uses_draft_voice_or_override(tmp_path, monkeypatch):
         assert client.post("/api/tts", json={"text": "Hi", "language": "te-IN"}).content == b"RIFF...."
         client.post("/api/tts", json={"text": "Hi", "voice": {"model": "timbre-v2.5", "voice": "x", "speed": 0.9}})
         assert client.post("/api/tts", json={"text": "Hi", "voice": {"speed": 3}}).status_code == 422
-    assert seen[0] == ("te-IN", {"model": "timbre-v3.0", "voice": "Shivani", "speed": 1.0})
+    assert seen[0] == ("te-IN", {"model": "timbre-v2.5", "voice": "Shivani", "speed": 1.0})
     assert seen[1][1]["model"] == "timbre-v2.5"
     store.engine.dispose()
 
@@ -299,4 +308,69 @@ def test_call_list_is_one_query(tmp_path):
     event.listen(store.engine, "before_cursor_execute", lambda *args: statements.append(args[2]))
     assert len(store.calls()) == 5
     assert len(statements) == 1
+    store.engine.dispose()
+
+
+def test_short_fragment_waits_for_the_rest_of_the_sentence(tmp_path, fake_llm):
+    client, store = make_client(tmp_path, FakeTTS())
+    with client:
+        call = start_call(client)
+        with client.websocket_connect(f"/ws/calls/{call['id']}") as ws:
+            receive_until(ws, "audio_end")
+            ws.send_bytes(b"FRAGMENT")
+            events = receive_until(ws, "audio_end")
+            assert sum(e["type"] == "call" for e in events) == 1
+    messages = store.call(call["id"])["messages"]
+    assert len(messages) == 3 and messages[1]["content"] == "సరే. ఫిల్టర్ ఎప్పుడు మార్చాలి?"
+    store.engine.dispose()
+
+
+def test_lone_fragment_is_still_answered(tmp_path, fake_llm):
+    client, store = make_client(tmp_path, FakeTTS())
+    with client:
+        call = start_call(client)
+        with client.websocket_connect(f"/ws/calls/{call['id']}") as ws:
+            receive_until(ws, "audio_end")
+            ws.send_bytes(b"LONE")
+            assert receive_until(ws, "call")[-1]["call"]["messages"][1]["content"] == "సరే."
+    store.engine.dispose()
+
+
+@pytest.mark.parametrize("replies,expected,calls", [
+    (["ज़रूर, आपकी रिक्वेस्ट नोट कर ली है।", "Sure, your request is flagged for staff review."], "Sure, your request is flagged for staff review.", 2),
+    (["Sure, noted."], "Sure, noted.", 1),
+    (["ज़रूर, नोट कर लिया।", "फिर से हिंदी।"], "ज़रूर, नोट कर लिया।", 2),   # Still wrong: keep the first, don't drop the turn.
+])
+def test_reply_language_is_corrected_once(monkeypatch, business, replies, expected, calls):
+    seen = []
+
+    async def reason(system, payload):
+        seen.append(system)
+        return {"reply": replies[len(seen) - 1], "language": "en-IN", "category": "Installation", "status": "open",
+                "summary": "s", "fields": {}, "source_ids": []}
+    monkeypatch.setattr(engine, "reason", reason)
+    messages = [{"role": "assistant", "content": "नमस्ते"}, {"role": "user", "content": "Can I talk to a person?"}]
+    decision, _ = asyncio.run(engine.respond(business, messages, {}, caller_language="en-IN"))
+    assert decision.reply == expected and len(seen) == calls
+    if calls == 2:
+        assert "CORRECTION" in seen[1] and "English" in seen[1]
+
+
+def test_reply_start_is_buffered_past_the_first_tiny_chunk(tmp_path, fake_llm):
+    class StutteringTTS(FakeTTS):
+        async def stream(self, text, language, settings):
+            self.requests.append((text, language, settings))
+            yield b"\x01" * 1958                 # Timbre v3.0: ~60 ms first...
+            await asyncio.sleep(0.2)              # ...then a pause...
+            for _ in range(4):
+                yield b"\x02" * 4096              # ...then the rest.
+    client, store = make_client(tmp_path, StutteringTTS())
+    with client:
+        call = start_call(client)
+        with client.websocket_connect(f"/ws/calls/{call['id']}") as ws:
+            events = receive_until(ws, "audio_end")
+            audio = [e["bytes"] for e in events if e["type"] == "audio"]
+            assert len(audio[0]) >= 8000            # First send already holds 250 ms.
+            kinds = [e["type"] for e in events]
+            assert kinds.index("metrics") < kinds.index("audio")
     store.engine.dispose()

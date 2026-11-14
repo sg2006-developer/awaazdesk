@@ -81,8 +81,9 @@ async def run_scenario(base, label, language, text):
                     event = json.loads(raw)
                     if event["type"] == "audio_end" and not greeting_done.is_set():
                         greeting_done.set()
-                    elif event["type"] == "final":
-                        result.update(heard=event["text"], heard_language=event.get("language"))
+                    elif event["type"] == "final":   # A pause can split one line into several segments.
+                        result["heard"] = f"{result.get('heard', '')} {event['text']}".strip()
+                        result["heard_language"] = event.get("language")
                     elif event["type"] == "call":
                         reply = event["call"]["messages"][-1]
                         result.update(reply=reply["content"], reply_language=reply["language"],

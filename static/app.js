@@ -22,7 +22,7 @@ const PREVIEW = {
   'gu-IN': 'નમસ્તે! {name} ને કૉલ કરવા બદલ આભાર. હું તમારી કેવી રીતે મદદ કરી શકું?',
   'pa-IN': 'ਸਤ ਸ੍ਰੀ ਅਕਾਲ! {name} ਨੂੰ ਕਾਲ ਕਰਨ ਲਈ ਧੰਨਵਾਦ। ਮੈਂ ਤੁਹਾਡੀ ਕਿਵੇਂ ਮਦਦ ਕਰ ਸਕਦੀ ਹਾਂ?',
 };
-const DEFAULT_VOICE = {model: 'timbre-v3.0', voice: 'Shivani', speed: 1.0};
+const DEFAULT_VOICE = {model: 'timbre-v2.5', voice: 'Shivani', speed: 1.0};
 
 let config, revision, versions = [], calls = [], health, voices;
 let currentCall = null, live = null, busy = false, recording = null, speechURL = null, noticeTimer;
@@ -447,6 +447,8 @@ function stopLive() {
 }
 
 async function goLive() {
+  $('#speech-player').pause();
+  $('#speech-player').hidden = true;   // Live calls play through the WebSocket, not this element.
   live = new LiveSession(currentCall.id, onLiveEvent);
   live.bargeIn = $('#barge-in').checked;
   callControls();

@@ -23,7 +23,7 @@ def test_v3_voice_speaks_every_language():
     assert speech.pick_voice({"model": "timbre-v3.0", "voice": "Kalpana"}, "te-IN") == ("timbre-v3.0", "Kalpana")
     # Unknown or legacy voice names fall back to a valid v3.0 voice instead of a 400 from Gnani.
     assert speech.pick_voice({"model": "timbre-v3.0", "voice": "Nalini"}, "hi-IN") == ("timbre-v3.0", "Shivani")
-    assert speech.pick_voice(None, "en-IN") == ("timbre-v3.0", "Shivani")
+    assert speech.pick_voice(None, "en-IN") == ("timbre-v2.5", "Kaveri")   # Default: native voice per language.
 
 
 @pytest.mark.parametrize("language,voice", [("te-IN", "Suhana"), ("hi-IN", "Nalini"), ("ta-IN", "Asmita"), ("xx", "Kaveri")])
@@ -45,6 +45,8 @@ def test_recognition_hints_from_business(business):
     assert hints["keyterms"][0] == "ClearDrop Care"
     assert "AMC" in hints["keyterms"] and "Technician delay" in hints["keyterms"]
     assert len({k.casefold() for k in hints["keyterms"]}) == len(hints["keyterms"])
+    # Indic-script keyterms bias every caller toward that script (Telugu came back in Devanagari).
+    assert "फिल्टर" not in hints["keyterms"] and "nahi aaya" in hints["keyterms"]
     assert len(hints["keyterms"]) <= 200 and len(hints["topic"]) <= 1600
     assert len(hints["previous_text"]) == 600
 

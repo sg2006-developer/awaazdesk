@@ -52,7 +52,7 @@
     }
   ],
   "voice": {
-    "model": "timbre-v3.0",
+    "model": "timbre-v2.5",
     "voice": "Shivani",
     "speed": 1.0
   },

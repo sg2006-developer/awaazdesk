@@ -39,18 +39,18 @@ reasons over the business's approved knowledge with an LLM, answers aloud in the
 ## Measured performance
 
 Real Gnani + Gemini 2.5 Flash, caller audio streamed at real-time speed through the app's WebSocket
-(`scripts/check_voice.py --live`, Nov 2026):
+(`scripts/check_voice.py --live`, Nov 2026, Timbre v2.5 voices). One of two runs:
 
-| Caller says (language) | Prisma heard | Reply language | Ticket | STT | LLM | TTS first audio | **Total** |
+| Caller says (language) | Prisma heard | Reply language | Ticket | STT | LLM | Timbre audio | **Total** |
 | --- | --- | --- | --- | ---: | ---: | ---: | ---: |
-| Technician late (English) | …booking ID is CD-1042 | English | Technician delay → human | 157 ms | 2.15 s | 0.85 s | **3.16 s** |
-| When to change filter (Hindi) | मेरे water purifier का filter… | Hindi | Filter replacement | 118 ms | 1.79 s | 1.22 s | **3.13 s** |
-| Technician late (Telugu) | టెక్నీషియన్ ఇంకా రాలేదు… CD-2042 | Telugu | Technician delay → human | 156 ms | 2.04 s | 1.55 s | **3.75 s** |
-| Double charge, refund (Hinglish) | मुझे double charge हुआ है… CD-3042 | Hindi | Payment issue → human | 159 ms | 2.01 s | 0.20 s | **2.38 s** |
+| Technician late (English) | …booking ID is CD-1042 | English | Technician delay → human | 151 ms | 2.13 s | 0.23 s | **2.52 s** |
+| When to change filter (Hindi) | मेरे water purifier का filter… | Hindi | Filter replacement | 101 ms | 1.63 s | 0.29 s | **2.02 s** |
+| Technician late (Telugu) | టెక్నీషియన్ ఇంకా రాలేదు… CD-2042 | Telugu | Technician delay → human | 174 ms | 1.67 s | 0.17 s | **2.02 s** |
+| Double charge, refund (Hinglish) | मुझे double charge हुआ है… CD-3042 | Hindi | Payment issue → human | 100 ms | 1.73 s | 0.30 s | **2.13 s** |
 
-Median **3.15 s**. Prisma finalises a transcript ~150 ms after the caller stops; the LLM is the largest
-share (see *Next steps*). Timbre's first-chunk time varies from 0.2 to 1.5 s request to request
-on the same warm connection.
+Over both runs (8 turns): language detected correctly 8/8, every ticket correct, **median 2.06 s** from the
+end of the caller's speech to the agent's voice (range 1.89–2.52 s). "Timbre audio" is the time until 250 ms
+of reply audio is ready to play, which is when the caller actually starts hearing it. The LLM is ~80% of the wait.
 
 ## Architecture
 
@@ -77,25 +77,35 @@ on the same warm connection.
 | `app/engine.py` | Retrieval, LLM decision + validation + guardrails, `take_turn` shared by text and voice |
 | `app/store.py` | Versioned config, calls and tickets with optimistic concurrency (`ConflictError`) |
 | `app/providers.py` | Pooled HTTP client, LLM call, service-specific error messages |
-| `static/mic-worklet.js` | Real-time mic capture, 63-tap windowed-sinc low-pass + resample to 16 kHz |
+| `static/mic-worklet.js` | Real-time mic capture; anti-aliasing low-pass (63-tap windowed sinc, >9 kHz cut ~60 dB) + resample to 16 kHz |
 | `static/live.mjs`, `audio.mjs` | WebSocket session, gapless PCM player, meters |
 
 ### Things I learned about the Gnani APIs (verified against the live service)
 
-These aren't in the docs (or differ from them) and shaped the design. Tests in `tests/test_speech.py` pin them down.
+These aren't in the docs (or differ from them) and shaped the design. Tests pin the behaviour down.
 
-1. **Live partials exist.** The STT `connected` message advertises `partials_enabled`; sending the header
-   `x-partials: true` streams `partial_transcript` frames with `stable_text`/`volatile_text`, then
-   `speech_end` + `final_transcript` (instead of the documented `processing` + `transcript`).
-2. **TTS sends a second, data-less `complete`** ("Streaming completed") after each request. On a reused
-   connection the next request appears to finish instantly unless you wait for `start` first.
-3. **Opening a TTS WebSocket costs ~1.5 s.** So each call keeps one warm connection and pre-warms it
-   during the greeting; after a barge-in the interrupted socket is dropped and a new one warmed in the
-   background (the next reply still started in 0.69 s).
-4. **Downsampling must be filtered.** Naïve 48→16 kHz interpolation turned clear Telugu into Devanagari
-   gibberish; with an anti-aliasing filter (or a 16 kHz `AudioContext`) the same audio transcribes perfectly.
-5. The original code always used voice *Nalini* (a Hindi-preferred Timbre v2.5 voice) for every language.
-   v3.0 voices speak all ten; v2.5 voices must match the language.
+1. **Indic-script `keyterms` change the output script for every caller.** With the sample business's Devanagari
+   keywords (फिल्टर, नहीं आया) in `keyterms`, Prisma wrote Telugu speech in Hindi script 3/3 times
+   ("टेक्नीशियन इंका रालेदु"); without them, 3/3 correct. AwaazDesk now sends only Latin-script terms.
+2. **Timbre v3.0 streams a ~60 ms chunk, then pauses ~1 s.** Played naively that's a blip and a gap, and a
+   "first audio" metric based on the first chunk is ~1 s too optimistic. Timbre v2.5 had 250 ms of audio ready
+   in a median 0.72 s versus 1.85 s for v3.0, so v2.5 (native voice per language) is the default, and every reply
+   is buffered to 250 ms before playing.
+3. **Live partials exist.** The STT `connected` message advertises `partials_enabled`; the header
+   `x-partials: true` streams `partial_transcript` frames (`stable_text`/`volatile_text`), then `speech_end` +
+   `final_transcript` instead of the documented `processing` + `transcript`.
+4. **Streaming accepts one language code only.** The docs say v3.0 takes 1–4 comma-separated codes; over the
+   WebSocket that returns "exactly one locale is required", so streaming uses `indic-auto`.
+5. **TTS sends a second, data-less `complete`** ("Streaming completed") after each request; a reused
+   connection must wait for `start` or the next reply appears to finish instantly.
+6. **Opening a TTS WebSocket costs ~1.5 s,** so each call keeps one warm. There's no cancel message: after a
+   barge-in the socket is dropped and re-warmed, and with Timbre v3.0 the next reply sometimes started up to 4 s
+   late, consistent with the interrupted synthesis still running server-side.
+
+Two app-side behaviours came out of live testing too: the LLM drifted into the previous turn's language (an
+English request after Hindi turns got a Hindi reply), so replies whose script doesn't match the caller get one
+corrective retry; and a short "సరే." followed by a pause was answered on its own, so utterances of one or two
+words wait 1.2 s for the caller to continue.
 
 ## Run it
 
@@ -153,7 +163,7 @@ visitors with the code, so keep the data synthetic.
 ## Tests
 
 ```sh
-uv run pytest -q                                  # 55 offline tests, no credits used
+uv run pytest -q                                  # 61 offline tests, no credits used
 uv run python scripts/check_reasoning.py --live   # LLM decisions in English/Hindi/Telugu
 uv run python scripts/check_voice.py --live       # full voice loop in 4 languages + latency table
 ```
@@ -178,10 +188,12 @@ plus the Gnani protocol handling, recognition hints, voice selection and HTTP ed
 
 ## Limits and next steps
 
-- **LLM latency is the bottleneck** (~2 s of ~3 s). Next: stream the LLM response and start TTS on the
+- **LLM latency is the bottleneck** (~1.7 s of ~2 s). Next: stream the LLM response and start TTS on the
   first sentence of `spoken_reply` while the ticket JSON is still generating.
 - **Retrieval for large knowledge bases is lexical.** Small libraries (≤8,000 chars) go to the model
   whole, so a Telugu question can use English documents; larger ones need multilingual embeddings.
+- **Turn-taking is silence-based.** A pause over 0.6 s mid-sentence ends the caller's turn; the agent may
+  answer the first half (e.g. ask for a booking ID the caller was about to give). Semantic endpointing would help.
 - **Telephony.** This is a browser simulator. Gnani ships LiveKit and Pipecat plugins and Timbre outputs
   8 kHz µ-law directly, which is the path to a real phone number.
 - **Post-call analytics** with Gnani Batch STT (speaker separation, up to 4 h files).

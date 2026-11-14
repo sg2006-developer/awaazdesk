@@ -22,9 +22,10 @@ class Document(BaseModel):
 
 class VoiceSettings(BaseModel):
     """How the agent sounds. Older saved configurations get these defaults."""
-    # "timbre-v3.0": one voice that speaks every language.
-    # "timbre-v2.5": a native voice picked per reply language (lower latency).
-    model: Literal["timbre-v3.0", "timbre-v2.5"] = "timbre-v3.0"
+    # "timbre-v2.5": a native voice picked per reply language. Default: measured ~0.7 s to
+    #   250 ms of audio, vs ~1.9 s for v3.0, whose stream pauses ~1 s after its first chunk.
+    # "timbre-v3.0": one chosen voice that speaks every language.
+    model: Literal["timbre-v3.0", "timbre-v2.5"] = "timbre-v2.5"
     voice: str = Field(default="Shivani", max_length=40)
     speed: float = Field(default=1.0, ge=0.85, le=1.15)
 

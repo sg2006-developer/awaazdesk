@@ -63,7 +63,7 @@ def api_key():
 def pick_voice(settings, language):
     """Return (model, voice) for a reply in `language`."""
     settings = settings or {}
-    model = settings.get("model", "timbre-v3.0")
+    model = settings.get("model", "timbre-v2.5")
     if model == "timbre-v2.5":
         return model, V25_VOICE_FOR_LANGUAGE.get(language, "Kaveri")
     voice = settings.get("voice", "Shivani")
@@ -79,6 +79,9 @@ def tts_language(text, language):
     return language
 
 
+INDIC_SCRIPT = re.compile(r"[\u0900-\u0DFF]")
+
+
 def recognition_hints(config, previous_text=""):
     """Prisma v3.0 context: words to favour and what the call is about."""
     terms = [config.get("name", "")]
@@ -88,6 +91,11 @@ def recognition_hints(config, previous_text=""):
         terms += [k for k in category.get("keywords", "").split(",")]
     seen, keyterms = set(), []
     for term in (t.strip() for t in terms):
+        # Verified on the live API: Devanagari keyterms (e.g. "फिल्टर") made Prisma write Telugu
+        # speech in Hindi script 3/3 times; without them, 3/3 correct. With indic-auto, only
+        # send Latin-script terms (brand and product names), which bias no particular language.
+        if INDIC_SCRIPT.search(term):
+            continue
         if term and len(term) <= 50 and "<|" not in term and term.casefold() not in seen:
             seen.add(term.casefold())
             keyterms.append(term)

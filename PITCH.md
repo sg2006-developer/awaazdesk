@@ -27,27 +27,30 @@ Customers then **just talk** in any of ten Indian languages, or mix them:
 
 | Caller (language) | Understood | Replied in | Ticket | Caller stops → agent speaks |
 | --- | --- | --- | --- | ---: |
-| Technician late (English) | ✓ booking CD-1042 | English | Technician delay → human | 3.2 s |
-| Filter question (Hindi) | ✓ | Hindi | Filter replacement | 3.1 s |
-| Technician late (Telugu) | ✓ booking CD-2042 | Telugu | Technician delay → human | 3.8 s |
-| Refund, double charge (Hinglish) | ✓ booking CD-3042 | Hindi | Payment issue → human | 2.4 s |
+| Technician late (English) | ✓ booking CD-1042 | English | Technician delay → human | 2.5 s |
+| Filter question (Hindi) | ✓ | Hindi | Filter replacement | 2.0 s |
+| Technician late (Telugu) | ✓ booking CD-2042 | Telugu | Technician delay → human | 2.0 s |
+| Refund, double charge (Hinglish) | ✓ booking CD-3042 | Hindi | Payment issue → human | 2.1 s |
 
-Prisma finalises speech in ~150 ms. Median end-to-end response is **3.15 s**, and the LLM is the largest share.
-55 automated tests cover the call loop, Gnani protocol handling, guardrails and the hosted-demo protections.
+Across 8 benchmark turns: languages detected 8/8, tickets correct 8/8, **median 2.06 s** from the end of the caller's
+speech to the agent's audible voice (Prisma finalises in ~150 ms; the LLM is ~80% of the wait).
+61 automated tests cover the call loop, Gnani protocol handling, guardrails and the hosted-demo protections.
 
 ## What's novel
 
-- **Language-true voice:** reply language follows the caller, and a separate *spoken* version of each reply spells
-  out IDs ("C D one zero four two") so Timbre pronounces them correctly.
-- **Built on what the Gnani APIs actually do,** found by testing the live service: live partial transcripts
-  (`x-partials`), a second TTS completion frame that breaks reused connections, and why browser audio must be
-  anti-aliased before 16 kHz streaming (without it, Telugu came back as Devanagari gibberish).
+- **Language-true voice:** reply language follows the caller (with a corrective retry if the model drifts into an
+  earlier turn's language), a native Timbre voice is picked per language, and a separate *spoken* version of each
+  reply spells out IDs ("C D one zero four two") so they're pronounced correctly.
+- **Built on what the Gnani APIs actually do,** found by measuring the live service: Indic-script `keyterms` made
+  Prisma write Telugu callers in Hindi script (wrong 3/3 times before the fix, 0/3 after); Timbre v3.0 pauses ~1 s after its first
+  chunk (v2.5 is ~1.1 s faster to audible speech); live partials via `x-partials`; a second TTS completion frame
+  that breaks reused connections.
 - **Owner-safe by design:** versioned policies (every call keeps the version it started on), cited answers,
-  enforced escalation, and per-turn latency shown on screen.
+  enforced escalation, no promised refunds or timelines in any language, and per-turn latency shown on screen.
 
 ## Next
 
 Telephony through Gnani's LiveKit/Pipecat plugins and 8 kHz µ-law Timbre output; streaming LLM output into TTS to
-reach about 2 s; multilingual retrieval for large knowledge bases; post-call analytics with Gnani Batch STT.
+reach about 1 s; multilingual retrieval for large knowledge bases; post-call analytics with Gnani Batch STT.
 
 **Code:** github.com/sg2006-developer/awaazdesk · **Stack:** FastAPI, WebSockets, AudioWorklet, Gnani Prisma v3.0 + Timbre v3.0/v2.5, Gemini 2.5 Flash

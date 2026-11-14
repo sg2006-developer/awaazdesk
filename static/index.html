@@ -104,8 +104,8 @@
           <div class="section-title"><h2>Voice &amp; listening</h2><span class="pill subtle">Gnani</span></div>
           <label for="voice-model">Speech model</label>
           <select id="voice-model">
-            <option value="timbre-v3.0">Timbre v3.0 — one voice, all 10 languages</option>
-            <option value="timbre-v2.5">Timbre v2.5 — native voice per language</option>
+            <option value="timbre-v2.5">Timbre v2.5 — native voice per language (fastest)</option>
+            <option value="timbre-v3.0">Timbre v3.0 — one voice for all 10 languages (~1 s slower to start)</option>
           </select>
           <div id="voice-name-field"><label for="voice-name">Voice</label><select id="voice-name"></select></div>
           <p class="helper" id="voice-v25-note" hidden>Each reply uses a native voice for its language (e.g. Nalini for Hindi, Suhana for Telugu).</p>
@@ -114,7 +114,7 @@
           <div class="row preview-row"><select id="preview-language" aria-label="Preview language"></select><button id="preview-voice">▷ Preview voice</button></div>
           <label for="keyterms">Words to listen for (comma separated)</label>
           <textarea id="keyterms" rows="2" placeholder="ClearDrop, RO, AMC, TDS"></textarea>
-          <p class="helper">Sent to Prisma v3.0 as <code>keyterms</code>, together with your business name and category keywords, so brand and product names are heard correctly.</p>
+          <p class="helper">Sent to Prisma v3.0 as <code>keyterms</code>, with your business name and category keywords, so brand and product names are heard correctly. Use Latin script: Indic-script terms are skipped, because they push Prisma to write every caller in that script.</p>
         </article>
         <article class="card">
           <div class="section-title"><h2>Knowledge library</h2><button id="add-document">+ Add</button></div>
