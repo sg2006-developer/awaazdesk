@@ -9,9 +9,13 @@ Telugu, Tamil or any of ten Indian languages (or mixes them). AwaazDesk listens 
 reasons over the business's approved knowledge with an LLM, answers aloud in the caller's language with
 **Gnani Timbre**, and fills in a support ticket as the conversation happens.
 
-| Live call | Agent studio |
-| --- | --- |
-| Live captions, interruptions, language detection, latency breakdown, live ticket | Business knowledge, escalation rules, voice choice, speech recognition hints, versioned publishing |
+![A live call: the caller speaks Hindi, then switches to Telugu (live caption); the ticket and per-turn latency fill in as they talk](docs/live-call.png)
+
+<details><summary>Agent studio</summary>
+
+![Agent studio: business knowledge, escalation rules, Gnani voice choice and speech-recognition hints](docs/agent-studio.png)
+
+</details>
 
 ---
 
