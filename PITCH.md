@@ -54,4 +54,4 @@ speech to the agent's audible voice (Prisma finalises in ~150 ms; the LLM is ~80
 Telephony through Gnani's LiveKit/Pipecat plugins and 8 kHz µ-law Timbre output; streaming LLM output into TTS to
 reach about 1 s; multilingual retrieval for large knowledge bases; post-call analytics with Gnani Batch STT.
 
-**Code:** github.com/sg2006-developer/awaazdesk · **Stack:** FastAPI, WebSockets, AudioWorklet, Gnani Prisma v3.0 + Timbre v3.0/v2.5, Gemini 2.5 Flash
+**Code:** github.com/sg2006-developer/awaazdesk · **Live:** awaazdesk.onrender.com (access code on request) · **Stack:** FastAPI, WebSockets, AudioWorklet, Gnani Prisma v3.0 + Timbre v3.0/v2.5, Gemini 2.5 Flash

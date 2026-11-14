@@ -29,3 +29,5 @@ services:
         value: "300"
       - key: MAX_LIVE_CALLS
         value: "4"
+      - key: AUTO_PUBLISH_SAMPLE   # Free-tier disk is ephemeral: publish the sample on each fresh start.
+        value: "true"

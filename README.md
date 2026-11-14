@@ -2,7 +2,7 @@
 
 **A multilingual voice support agent that any small business can configure in minutes, built on Gnani's Indian-language speech stack.**
 
-📄 **[One-page solution pitch](PITCH.md)**
+📄 **[One-page solution pitch](PITCH.md)** · 🌐 **Live demo: [awaazdesk.onrender.com](https://awaazdesk.onrender.com)** (access code on request)
 
 A business owner describes their services, rules and FAQs. A caller then just *talks* in English, Hindi,
 Telugu, Tamil or any of ten Indian languages (or mixes them). AwaazDesk listens with **Gnani Prisma v3.0**,
@@ -162,13 +162,13 @@ A public URL could spend your credits, so the hosted demo is protected by:
 | Simultaneous live calls, max call length | 4, 5 minutes (`MAX_LIVE_CALLS`, `MAX_CALL_SECONDS`) |
 
 Render's free tier sleeps after 15 idle minutes (first visit then takes ~50 s), and its disk is ephemeral, so
-the demo resets to the sample business on each restart. Everything a visitor creates is visible to other
+the demo resets on each restart; `AUTO_PUBLISH_SAMPLE=true` republishes the sample business so calls work at once. Everything a visitor creates is visible to other
 visitors with the code, so keep the data synthetic.
 
 ## Tests
 
 ```sh
-uv run pytest -q                                  # 70 offline tests, no credits used
+uv run pytest -q                                  # 73 offline tests, no credits used
 uv run python scripts/check_reasoning.py --live   # LLM decisions in English/Hindi/Telugu
 uv run python scripts/check_voice.py --live       # full voice loop in 4 languages + latency table
 ```

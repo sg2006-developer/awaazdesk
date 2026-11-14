@@ -34,6 +34,10 @@ class Store:
             if not db.execute(text("SELECT id FROM draft WHERE id=1")).first():
                 seed = json.loads((ROOT / "sample_business.json").read_text())
                 db.execute(text("INSERT INTO draft VALUES (1,1,:c)"), {"c": json.dumps(seed)})
+            # Hosted demos on an ephemeral disk restart empty; publish the sample so a visitor can call at once.
+            if os.getenv("AUTO_PUBLISH_SAMPLE", "").lower() in ("1", "true", "yes") and not db.execute(text("SELECT id FROM versions")).first():
+                config = db.execute(text("SELECT config FROM draft WHERE id=1")).scalar_one()
+                db.execute(text("INSERT INTO versions VALUES (1,:c,:t)"), {"c": config, "t": now()})
 
     def draft(self):
         with self.engine.connect() as db:

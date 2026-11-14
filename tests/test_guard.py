@@ -119,3 +119,13 @@ def test_live_calls_end_at_the_time_limit(tmp_path, fake_llm):
             assert any("limited to" in e.get("message", "") for e in events)
     assert store.call(call["id"])["ended"] is True
     store.engine.dispose()
+
+
+@pytest.mark.parametrize("flag,published", [("true", True), ("", False)])
+def test_fresh_hosted_database_can_auto_publish_the_sample(tmp_path, monkeypatch, flag, published):
+    monkeypatch.setenv("AUTO_PUBLISH_SAMPLE", flag)
+    store = Store(f"sqlite:///{tmp_path / 'fresh.db'}")
+    store.initialize()
+    store.initialize()                       # Idempotent across restarts.
+    assert (len(store.versions()) == 1) is published
+    store.engine.dispose()
