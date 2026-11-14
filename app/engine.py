@@ -38,6 +38,32 @@ def reply_matches_language(text, language):
     expected = "hi-IN" if language == "mr-IN" else language   # Marathi shares Devanagari.
     return dominant == expected
 
+# Claims the agent must never make, in the languages seen in testing. The prompt forbids them,
+# but live calls showed slips ("हमने इसे ... टीम को भेज दिया है" = "we sent it to the team").
+FORBIDDEN_CLAIMS = re.compile("|".join([
+    r"\b(sent|forwarded|transferred|escalated)\b", r"\bwill (call|contact|reach out|get back|review|look into|be able to|be in touch)\b",
+    r"\b(soon|shortly|right away|immediately)\b",
+    r"भेज (दिया|दी|दिए)", r"भेजा (है|गया)", r"फ़?ॉरवर्ड", r"जल्द", r"(संपर्क|कॉल) (करेंगे|करेगी|करेगा)", r"देख(ेंगे|ेगी|ेगा)",
+    r"పంప(ాము|ించాము|బడింది)", r"ఫార్వర్డ్", r"త్వరలో", r"(సంప్రదిస్తారు|కాల్ చేస్తారు)",
+    r"அனுப்பி(னோம்|யுள்ளோம்)", r"விரைவில்", r"தொடர்பு கொள்வார்கள்",
+]), re.IGNORECASE)
+
+
+def reply_problems(decision, caller_language):
+    """Corrections the model needs, if its reply breaks a rule we can check mechanically."""
+    problems = []
+    if caller_language and not reply_matches_language(decision.reply, caller_language):
+        name = LANGUAGE_NAMES.get(caller_language, caller_language)
+        problems.append(f"your previous reply was not in {name}. The customer's latest message is in {name}; "
+                        f"write reply and spoken_reply in {name} and set language to {caller_language}")
+    claims = sorted({m.group(0) for m in FORBIDDEN_CLAIMS.finditer(f"{decision.reply} {decision.spoken_reply or ''}")})
+    if claims:
+        problems.append(f"your previous reply made a claim or promise that is not allowed ({', '.join(claims)}). Only say the "
+                        "request is flagged in the support dashboard for staff review; never say it was sent or forwarded, "
+                        "and never say anyone will call, review, help or respond, or when")
+    return problems
+
+
 def tokens(text):
     return set(re.findall(r"\w+", text.casefold())) - {"the", "a", "an", "is", "my", "i", "to", "for", "what", "me", "you", "and", "of", "it"}
 
@@ -138,12 +164,11 @@ async def respond(config, messages, previous, caller_language=None):
                    "messages": [{"role": m["role"], "content": m["content"]} for m in messages[-20:]],
                    "caller_language": caller_language, "previous_ticket": previous}
         decision = await decide(system, payload)
-        if caller_language and not reply_matches_language(decision.reply, caller_language):
-            # One corrective retry; if it still drifts, keep the answer rather than drop the turn.
-            name = LANGUAGE_NAMES.get(caller_language, caller_language)
-            retry = await decide(system + f" CORRECTION: your previous reply was not in {name}. The customer's latest message is in "
-                                 f"{name}; write reply and spoken_reply in {name} and set language to {caller_language}.", payload)
-            if reply_matches_language(retry.reply, caller_language):
+        problems = reply_problems(decision, caller_language)
+        if problems:
+            # One corrective retry; keep it only if it's better, and never drop the turn.
+            retry = await decide(system + " CORRECTION: " + " Also, ".join(problems) + ".", payload)
+            if len(reply_problems(retry, caller_language)) < len(problems):
                 decision = retry
         engine = "hosted-llm"
     allowed = {c["name"] for c in config["categories"]}
@@ -189,7 +214,9 @@ async def take_turn(store, call_id, text, revision, caller_language=None, stt_me
         user["meta"] = stt_meta
     messages = call["messages"] + [user]
     started = time.perf_counter()
-    decision, ticket = await respond(config, messages, call["ticket"], caller_language)
+    # Typed turns have no detected language; infer it from the script so the reply can't drift
+    # into an earlier turn's language (seen live: an English message answered in Hindi).
+    decision, ticket = await respond(config, messages, call["ticket"], caller_language or script_language(text))
     reply = {"role": "assistant", "content": decision.reply, "language": decision.language,
              "spoken": decision.spoken_reply or decision.reply,
              "meta": {"llm_ms": round((time.perf_counter() - started) * 1000)}}

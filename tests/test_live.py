@@ -386,3 +386,47 @@ def test_caller_can_interrupt_after_the_reply_was_fully_sent(tmp_path, fake_llm)
             ws.send_bytes(b"INTERRUPT")            # ...while the caller hears it, they talk.
             assert receive_until(ws, "barge_in")[-1]["type"] == "barge_in"
     store.engine.dispose()
+
+
+@pytest.mark.parametrize("reply,language,flagged", [
+    ("हमने इसे समीक्षा के लिए हमारी टीम को भेज दिया है।", "hi-IN", True),
+    ("I've flagged your request in our dashboard. They will be able to assist you further.", "en-IN", True),
+    ("Our team will get back to you shortly.", "en-IN", True),
+    ("మీ అభ్యర్థనను బృందానికి పంపాము.", "te-IN", True),
+    ("Please send your booking ID so I can flag this for staff review.", "en-IN", False),
+    ("आपकी बुकिंग ID नोट कर ली है और डैशबोर्ड में स्टाफ रिव्यू के लिए फ़्लैग कर दी है।", "hi-IN", False),
+])
+def test_forbidden_claims_are_detected(reply, language, flagged):
+    decision = engine.Decision(reply=reply, language=language, category="x", status="open", summary="")
+    assert bool(engine.reply_problems(decision, language)) is flagged
+
+
+def test_forbidden_claim_triggers_one_corrective_retry(monkeypatch, business):
+    replies = ["हमने इसे हमारी टीम को भेज दिया है।", "आपका अनुरोध डैशबोर्ड में स्टाफ रिव्यू के लिए फ़्लैग कर दिया गया है।"]
+    seen = []
+
+    async def reason(system, payload):
+        seen.append(system)
+        return {"reply": replies[len(seen) - 1], "language": "hi-IN", "category": "Technician delay", "status": "needs_human",
+                "summary": "s", "fields": {}, "source_ids": []}
+    monkeypatch.setattr(engine, "reason", reason)
+    messages = [{"role": "user", "content": "मेरा टेक्नीशियन नहीं आया"}]
+    decision, _ = asyncio.run(engine.respond(business, messages, {}, caller_language="hi-IN"))
+    assert decision.reply == replies[1] and len(seen) == 2 and "भेज दिया" in seen[1]
+
+
+def test_typed_turn_gets_language_hint_from_its_script(tmp_path, monkeypatch, business):
+    hints = []
+
+    async def reason(system, payload):
+        hints.append(payload["caller_language"])
+        return {"reply": "Noted and flagged for staff review.", "language": "en-IN", "category": "Technician delay",
+                "status": "needs_human", "summary": "s", "fields": {}, "source_ids": []}
+    monkeypatch.setattr(engine, "reason", reason)
+    client, store = make_client(tmp_path, FakeTTS())
+    with client:
+        call = start_call(client)
+        client.post(f"/api/calls/{call['id']}/turn", json={"text": "My technician has not arrived.", "revision": 0})
+        client.post(f"/api/calls/{call['id']}/turn", json={"text": "టెక్నీషియన్ రాలేదు", "revision": 1})
+    assert hints[0] == "en-IN" and hints[1] == "te-IN"
+    store.engine.dispose()

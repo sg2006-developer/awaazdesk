@@ -9,7 +9,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from fastapi.testclient import TestClient
 from app.config import ROOT, llm_ready, llm_settings
-from app.engine import draft_from_notes
+from app.engine import draft_from_notes, reply_matches_language
 from app.main import create_app
 from app.store import Store
 
@@ -45,6 +45,8 @@ def main():
                 assert ticket['category'] == category, f'{label}: category {ticket["category"]}'
                 assert ticket['status'] == status, f'{label}: status {ticket["status"]}'
                 assert ticket['engine'] == 'hosted-llm'
+                expected = {'English': 'en-IN', 'Hindi': 'hi-IN', 'Telugu': 'te-IN'}[label.split()[0]]
+                assert reply_matches_language(saved['messages'][-1]['content'], expected), f'{label}: reply not in {expected}'
                 if booking:
                     assert ticket['fields'].get('booking_id') == booking, label
                 if source:

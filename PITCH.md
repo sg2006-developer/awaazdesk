@@ -34,7 +34,7 @@ Customers then **just talk** in any of ten Indian languages, or mix them:
 
 Across 8 benchmark turns: languages detected 8/8, tickets correct 8/8, **median 2.06 s** from the end of the caller's
 speech to the agent's audible voice (Prisma finalises in ~150 ms; the LLM is ~80% of the wait).
-61 automated tests cover the call loop, Gnani protocol handling, guardrails and the hosted-demo protections.
+70 automated tests cover the call loop, Gnani protocol handling, guardrails and the hosted-demo protections.
 
 ## What's novel
 
@@ -46,7 +46,8 @@ speech to the agent's audible voice (Prisma finalises in ~150 ms; the LLM is ~80
   chunk (v2.5 is ~1.1 s faster to audible speech); live partials via `x-partials`; a second TTS completion frame
   that breaks reused connections.
 - **Owner-safe by design:** versioned policies (every call keeps the version it started on), cited answers,
-  enforced escalation, no promised refunds or timelines in any language, and per-turn latency shown on screen.
+  enforced escalation, and replies checked in code (not just by prompt) for false claims like "sent to the team"
+  in English, Hindi, Telugu and Tamil, with a corrective retry; per-turn latency is shown on screen.
 
 ## Next
 

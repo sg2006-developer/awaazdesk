@@ -102,9 +102,10 @@ These aren't in the docs (or differ from them) and shaped the design. Tests pin 
    barge-in the socket is dropped and re-warmed, and with Timbre v3.0 the next reply sometimes started up to 4 s
    late, consistent with the interrupted synthesis still running server-side.
 
-Two app-side behaviours came out of live testing too: the LLM drifted into the previous turn's language (an
-English request after Hindi turns got a Hindi reply), so replies whose script doesn't match the caller get one
-corrective retry; and a short "సరే." followed by a pause was answered on its own, so utterances of one or two
+App-side behaviours that came out of live testing: the LLM drifted into the previous turn's language (an
+English request after Hindi turns got a Hindi reply), and despite the prompt it sometimes said a request was
+"sent to the team" (हमने इसे टीम को भेज दिया है) or that staff "will assist you". Replies are now checked for the
+caller's script and for forbidden claims in English, Hindi, Telugu and Tamil, with one corrective retry. And a short "సరే." followed by a pause was answered on its own, so utterances of one or two
 words wait 1.2 s for the caller to continue.
 
 ## Run it
@@ -163,7 +164,7 @@ visitors with the code, so keep the data synthetic.
 ## Tests
 
 ```sh
-uv run pytest -q                                  # 61 offline tests, no credits used
+uv run pytest -q                                  # 70 offline tests, no credits used
 uv run python scripts/check_reasoning.py --live   # LLM decisions in English/Hindi/Telugu
 uv run python scripts/check_voice.py --live       # full voice loop in 4 languages + latency table
 ```
