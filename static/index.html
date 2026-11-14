@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>AwaazDesk — Your business, a voice</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2328775c'/%3E%3Ctext x='16' y='23' font-size='20' text-anchor='middle' fill='white' font-family='sans-serif'%3Ea%3C/text%3E%3C/svg%3E">
+</head>
+<body>
+<aside class="sidebar">
+  <a href="#" class="brand"><span class="brand-icon">a</span> awaazdesk<span class="brand-dot">.</span></a>
+  <div class="workspace-label">WORKSPACE</div>
+  <div class="business-switch"><span class="business-icon">C</span><div><strong id="business-name">Your business</strong><small>Support workspace</small></div></div>
+  <nav aria-label="Workspace navigation">
+    <button data-view="overview" class="active"><span>◫</span> Overview</button>
+    <button data-view="studio"><span>✧</span> Agent studio</button>
+    <button data-view="call"><span>◉</span> Live call</button>
+    <button data-view="tickets"><span>▤</span> Conversations <b id="ticket-count">0</b></button>
+  </nav>
+  <div class="sidebar-bottom">
+    <div class="tiny-wave">▂ ▆ ▃ █ ▅ ▂</div>
+    <strong>Your business. A voice.</strong>
+    <p>Speech by Gnani Prisma &amp; Timbre.</p>
+    <span class="local-tag">LOCAL WORKSPACE</span>
+  </div>
+</aside>
+<main>
+  <header>
+    <div class="breadcrumb">Workspace <span>/</span> <strong id="page-title">Overview</strong></div>
+    <div class="header-right"><span id="published-badge" class="pill">Unpublished</span><span class="avatar">Y</span></div>
+  </header>
+  <div id="notice" role="status" hidden></div>
+  <div id="provider-banner" class="provider-banner" hidden></div>
+
+  <section id="overview" class="view">
+    <div class="page-heading">
+      <div>
+        <div class="eyebrow">YOUR SUPPORT, CONNECTED</div>
+        <h1>A little less waiting.<br>A lot more listening.</h1>
+        <p>Turn what your business knows into live voice conversations in ten Indian languages.</p>
+      </div>
+      <button class="primary" data-go="call">Talk to your agent <span>↗</span></button>
+    </div>
+    <div class="stats">
+      <article><span class="stat-label">Conversations</span><strong id="stat-total">0</strong><small>Saved in your workspace</small></article>
+      <article><span class="stat-label">Needs a human</span><strong id="stat-human">0</strong><small>Ready for your team</small></article>
+      <article><span class="stat-label">Languages heard</span><strong id="stat-languages">0</strong><small id="stat-language-list">Detected by Gnani Prisma</small></article>
+      <article><span class="stat-label">Avg. voice response</span><strong id="stat-latency">—</strong><small>End of speech → first audio</small></article>
+    </div>
+    <div class="overview-grid">
+      <article class="hero-card">
+        <div class="eyebrow">BUILT AROUND YOUR BUSINESS</div>
+        <h2>Good support starts<br>with your knowledge.</h2>
+        <p>Describe your services. Set the boundaries. Give your agent the answers your customers need.</p>
+        <button class="dark-button" data-go="studio">Open agent studio <span>→</span></button>
+        <div class="wave-art" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        <span class="hero-foot">A VOICE THAT KNOWS YOUR BUSINESS</span>
+      </article>
+      <article class="card checklist">
+        <div class="section-title"><h2>Your launch checklist</h2><span class="pill subtle">3 steps</span></div>
+        <div class="check-item"><span>01</span><div><strong>Make it yours</strong><p>Services, rules, knowledge — and the voice callers hear.</p><button class="text-button" data-go="studio">Configure agent →</button></div></div>
+        <div class="check-item"><span>02</span><div><strong>Publish with confidence</strong><p>Save a version your conversations can rely on.</p><small id="check-published">No published configuration yet</small></div></div>
+        <div class="check-item"><span>03</span><div><strong>Have a conversation</strong><p>Speak in Hindi, Telugu, Tamil, English… and watch the ticket fill in.</p><button class="text-button" data-go="call">Start a live call →</button></div></div>
+      </article>
+    </div>
+    <article class="card recent">
+      <div class="section-title"><div><h2>Recent conversations</h2><p>Every request, with the context to act.</p></div><button class="text-button" data-go="tickets">View all →</button></div>
+      <div id="recent-list"></div>
+    </article>
+  </section>
+
+  <section id="studio" class="view" hidden>
+    <div class="page-heading compact">
+      <div><div class="eyebrow">AGENT STUDIO</div><h1>Teach it your business.</h1><p>Edit your draft, then publish when it’s ready.</p></div>
+      <div class="actions"><button id="save-draft">Save draft</button><button id="publish" class="primary">Save &amp; publish ↗</button></div>
+    </div>
+    <div class="studio-grid">
+      <div>
+        <article class="card">
+          <div class="section-title"><h2>Describe your support</h2><span class="pill subtle">Voice or text</span></div>
+          <label for="requirements">What should your agent know?</label>
+          <textarea id="requirements" rows="4" placeholder="We service water purifiers. Ask for a booking ID, and send technician-delay complaints to a person…"></textarea>
+          <div class="actions"><button id="record-requirements" class="record-control">◉ Speak requirements</button><button id="propose" class="primary">Create AI draft ✧</button></div>
+          <p class="helper">AI suggestions fill the form below. Nothing is published automatically.</p>
+          <div id="questions"></div>
+        </article>
+        <article class="card">
+          <h2>Business essentials</h2>
+          <label for="name">Business name</label><input id="name" maxlength="120">
+          <label for="description">What you do</label><textarea id="description" rows="3"></textarea>
+          <label for="greeting">Opening greeting</label><textarea id="greeting" rows="3"></textarea>
+          <label for="rules">Support rules &amp; boundaries</label><textarea id="rules" rows="6"></textarea>
+          <label for="required-fields">Information to collect (comma separated)</label><input id="required-fields" placeholder="booking_id, product_model">
+        </article>
+        <article class="card">
+          <div class="section-title"><h2>Request categories</h2><button id="add-category">+ Add category</button></div>
+          <p class="helper">Flag a category to always require human follow-up.</p>
+          <div id="categories"></div>
+        </article>
+      </div>
+      <div>
+        <article class="card">
+          <div class="section-title"><h2>Voice &amp; listening</h2><span class="pill subtle">Gnani</span></div>
+          <label for="voice-model">Speech model</label>
+          <select id="voice-model">
+            <option value="timbre-v3.0">Timbre v3.0 — one voice, all 10 languages</option>
+            <option value="timbre-v2.5">Timbre v2.5 — native voice per language</option>
+          </select>
+          <div id="voice-name-field"><label for="voice-name">Voice</label><select id="voice-name"></select></div>
+          <p class="helper" id="voice-v25-note" hidden>Each reply uses a native voice for its language (e.g. Nalini for Hindi, Suhana for Telugu).</p>
+          <label for="voice-speed">Speaking speed · <span id="speed-value">1.00×</span></label>
+          <input type="range" id="voice-speed" min="0.85" max="1.15" step="0.05" value="1">
+          <div class="row preview-row"><select id="preview-language" aria-label="Preview language"></select><button id="preview-voice">▷ Preview voice</button></div>
+          <label for="keyterms">Words to listen for (comma separated)</label>
+          <textarea id="keyterms" rows="2" placeholder="ClearDrop, RO, AMC, TDS"></textarea>
+          <p class="helper">Sent to Prisma v3.0 as <code>keyterms</code>, together with your business name and category keywords, so brand and product names are heard correctly.</p>
+        </article>
+        <article class="card">
+          <div class="section-title"><h2>Knowledge library</h2><button id="add-document">+ Add</button></div>
+          <p class="helper">Approved facts, FAQs and policies. Paste text or import a .txt / .md file.</p>
+          <label class="upload-label" for="document-file">↑ Import text document</label>
+          <input id="document-file" type="file" accept=".txt,.md,text/plain,text/markdown" hidden>
+          <div id="documents"></div>
+        </article>
+        <article class="card">
+          <h2>Published versions</h2>
+          <p class="helper">Existing calls keep their original version. Restore an older version as a draft, then publish it.</p>
+          <div id="versions"></div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <section id="call" class="view" hidden>
+    <div class="page-heading compact">
+      <div>
+        <div class="eyebrow">LIVE VOICE CALL</div>
+        <h1>Hear your agent in action.</h1>
+        <p>Just talk — in any of ten Indian languages, or mix them. The agent replies in your language.</p>
+      </div>
+      <div class="actions">
+        <label class="check-label inline"><input type="checkbox" id="voice-mode" checked> Hands-free voice</label>
+        <button id="start-call" class="primary">Start new call ↗</button>
+      </div>
+    </div>
+    <div class="call-grid">
+      <article class="card conversation">
+        <div class="section-title">
+          <div><h2 id="call-title">Your support agent</h2><p id="call-state">Start a call to connect.</p></div>
+          <span class="pill" id="call-version">—</span>
+        </div>
+        <div class="live-bar" id="live-bar" hidden>
+          <div class="meter"><span>You</span><b><i id="mic-meter"></i></b></div>
+          <div class="meter agent"><span>Agent</span><b><i id="agent-meter"></i></b></div>
+          <span class="live-status" id="live-status">Connecting…</span>
+          <button id="mute" class="small">Mute</button>
+        </div>
+        <div id="messages" class="messages" aria-live="polite">
+          <div class="empty"><div class="empty-icon">◉</div><h3>A conversation starts here.</h3><p>Publish your configuration, then start a call.</p></div>
+        </div>
+        <div id="caption" class="caption" hidden></div>
+        <div class="composer">
+          <label for="call-text" id="composer-label">Your message</label>
+          <textarea id="call-text" rows="2" placeholder="My technician hasn't arrived. My booking ID is CD1042." disabled></textarea>
+          <div class="actions">
+            <button id="record-call" class="record-control" disabled>◉ Record message</button>
+            <button id="send-turn" class="primary" disabled>Send →</button>
+          </div>
+          <div class="call-controls">
+            <label id="auto-speak-label"><input type="checkbox" id="auto-speak" checked> Read replies aloud</label>
+            <label id="barge-in-label" hidden><input type="checkbox" id="barge-in" checked> Let me interrupt the agent (best with headphones)</label>
+            <button id="end-call" class="text-button" disabled>End call</button>
+          </div>
+          <audio id="speech-player" controls hidden></audio>
+        </div>
+      </article>
+      <aside class="call-aside">
+        <article class="card">
+          <div class="eyebrow">LIVE TICKET</div>
+          <h2>Context, captured.</h2>
+          <div id="live-ticket"><p class="helper">Category, language, collected details and follow-up status appear as you talk.</p></div>
+        </article>
+        <article class="card">
+          <div class="eyebrow">RESPONSE TIME</div>
+          <h2>Where the time goes.</h2>
+          <div id="latency"><p class="helper">After your first spoken turn: Prisma transcription, reasoning, and time to Timbre’s first audio.</p></div>
+        </article>
+        <article class="card">
+          <div class="eyebrow">TRY A SCENARIO</div>
+          <button class="scenario" data-scenario="My technician hasn't arrived. My booking ID is CD1042.">A technician is running late <span>↗</span></button>
+          <button class="scenario" data-scenario="मेरे वाटर प्यूरीफायर का फ़िल्टर कितने समय में बदलना चाहिए?">Hindi: when to change the filter <span>↗</span></button>
+          <button class="scenario" data-scenario="టెక్నీషియన్ ఇంకా రాలేదు. నా బుకింగ్ ఐడీ CD2042.">Telugu: technician hasn't come <span>↗</span></button>
+          <button class="scenario" data-scenario="Mujhe double charge hua hai, refund chahiye. Booking ID CD3042 hai.">Hinglish: refund needs a human <span>↗</span></button>
+          <p class="helper">Say these aloud in a live call, or click to type them. Scenarios are synthetic. Handoffs create dashboard tickets; they do not connect a real phone line.</p>
+        </article>
+      </aside>
+    </div>
+  </section>
+
+  <section id="tickets" class="view" hidden>
+    <div class="page-heading compact">
+      <div><div class="eyebrow">CONVERSATIONS</div><h1>Every call. Clear next steps.</h1><p>Review the conversation, its language, evidence and the policy version behind it.</p></div>
+      <button id="refresh-tickets">↻ Refresh</button>
+    </div>
+    <div class="ticket-filters">
+      <input id="search-tickets" placeholder="Search transcript or category" aria-label="Search conversations">
+      <select id="filter-status" aria-label="Filter by status"><option value="">All statuses</option><option value="needs_human">Needs human</option><option value="open">Open</option><option value="resolved">Resolved</option></select>
+      <select id="filter-language" aria-label="Filter by language"><option value="">All languages</option></select>
+      <button id="export-tickets">Export JSON ↓</button>
+    </div>
+    <div class="card" id="ticket-list"></div>
+    <article class="card" id="ticket-detail" hidden></article>
+  </section>
+  <footer>AwaazDesk <span>Business knowledge → helpful conversations</span><small>Single-business preview · No telephone number connected</small></footer>
+</main>
+<script type="module" src="/static/app.js"></script>
+</body>
+</html>
