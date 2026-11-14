@@ -374,3 +374,15 @@ def test_reply_start_is_buffered_past_the_first_tiny_chunk(tmp_path, fake_llm):
             kinds = [e["type"] for e in events]
             assert kinds.index("metrics") < kinds.index("audio")
     store.engine.dispose()
+
+
+def test_caller_can_interrupt_after_the_reply_was_fully_sent(tmp_path, fake_llm):
+    # Fast TTS: 4 s of audio arrives at once, but the browser is still playing it.
+    client, store = make_client(tmp_path, FakeTTS(chunks=100, delay=0))
+    with client:
+        call = start_call(client)
+        with client.websocket_connect(f"/ws/calls/{call['id']}") as ws:
+            receive_until(ws, "audio_end", limit=300)   # Server has sent everything...
+            ws.send_bytes(b"INTERRUPT")            # ...while the caller hears it, they talk.
+            assert receive_until(ws, "barge_in")[-1]["type"] == "barge_in"
+    store.engine.dispose()

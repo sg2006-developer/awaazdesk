@@ -42,6 +42,9 @@ class LiveCall:
         self.stt_latency = None
         self.voice_ready = False
         self.speech_started = asyncio.Event()
+        # Timbre can send a reply faster than real time, so the agent is still audible in the
+        # browser after we finish sending. Track when playback should end to allow barge-in then too.
+        self.playback_ends = 0.0
 
     def _duration(self):
         seconds = int(self.max_seconds or 0)
@@ -211,12 +214,22 @@ class LiveCall:
 
     # ------------------------------------------------------------ speech out
     def is_speaking(self):
-        return self.speaking is not None and not self.speaking.done()
+        sending = self.speaking is not None and not self.speaking.done()
+        return sending or time.perf_counter() < self.playback_ends
 
     async def interrupt(self):
-        if self.is_speaking():
+        if not self.is_speaking():
+            return
+        if self.speaking is not None and not self.speaking.done():
             self.speaking.cancel()
-            await self.send(type="barge_in")
+        self.playback_ends = 0.0
+        await self.send(type="barge_in")   # The browser drops whatever it still has queued.
+
+    async def play(self, audio):
+        """Send agent audio and extend the estimated end of browser playback."""
+        now = time.perf_counter()
+        self.playback_ends = max(self.playback_ends, now) + len(audio) / (2 * SAMPLE_RATE)
+        await self.send_audio(audio)
 
     async def speak(self, text, language, config, llm_ms=None):
         started = time.perf_counter()
@@ -226,7 +239,7 @@ class LiveCall:
         try:
             async for chunk in self.tts.stream(text, language, config.get("voice")):
                 if first_audio is not None:
-                    await self.send_audio(chunk)
+                    await self.play(chunk)
                     continue
                 # Timbre v3.0 sends a ~60 ms chunk, then nothing for ~1 s. Playing it at once
                 # gives a blip and a gap, so hold the start until 250 ms of audio is ready and
@@ -235,11 +248,11 @@ class LiveCall:
                 if len(pending) >= START_BUFFER_BYTES:
                     first_audio = time.perf_counter()
                     await self.send(type="metrics", **self.metrics(started, first_audio, llm_ms))
-                    await self.send_audio(bytes(pending))
+                    await self.play(bytes(pending))
             if first_audio is None and pending:   # A reply shorter than the buffer.
                 first_audio = time.perf_counter()
                 await self.send(type="metrics", **self.metrics(started, first_audio, llm_ms))
-                await self.send_audio(bytes(pending))
+                await self.play(bytes(pending))
         except (SpeechError, HTTPException) as exc:
             await self.send(type="error", message=f"{getattr(exc, 'detail', exc)} The text reply is shown above.")
         finally:
