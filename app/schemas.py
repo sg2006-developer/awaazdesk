@@ -61,6 +61,10 @@ class BusinessConfig(BaseModel):
         return cleaned
 
 
+class AccessRequest(BaseModel):
+    code: str = Field(min_length=1, max_length=200)
+
+
 class DraftRequest(BaseModel):
     config: BusinessConfig
     revision: int = Field(ge=1)

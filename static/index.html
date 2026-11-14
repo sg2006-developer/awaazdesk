@@ -214,6 +214,18 @@
   </section>
   <footer>AwaazDesk <span>Business knowledge → helpful conversations</span><small>Single-business preview · No telephone number connected</small></footer>
 </main>
+<div id="access-gate" class="access-gate" hidden>
+  <form id="access-form" class="card access-card">
+    <span class="brand-icon">a</span>
+    <h2>AwaazDesk demo</h2>
+    <p>A multilingual voice support agent built on Gnani Prisma and Timbre. Enter the access code you were given.</p>
+    <label for="access-code">Access code</label>
+    <input id="access-code" autocomplete="off" autocapitalize="off" spellcheck="false" required>
+    <p id="access-error" class="access-error" role="alert" hidden></p>
+    <button class="primary" type="submit">Enter demo →</button>
+    <small>Demo data is synthetic. Calls are limited to 5 minutes; transcripts are visible to other demo visitors.</small>
+  </form>
+</div>
 <script type="module" src="/static/app.js"></script>
 </body>
 </html>

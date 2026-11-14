@@ -31,9 +31,31 @@ const turnMetrics = JSON.parse(sessionStorage.getItem('awaazdesk-metrics') || '{
 async function api(path, options = {}) {
   const response = await fetch('/api' + path, {headers: {'Content-Type': 'application/json'}, ...options});
   const data = await response.json();
+  if (response.status === 401 && data.access_required) { showAccessGate(); throw Error(data.detail); }
   if (!response.ok) throw Error(typeof data.detail === 'string' ? data.detail : 'Some fields are invalid. Check the form and try again.');
   return data;
 }
+
+function showAccessGate() {
+  $('#access-gate').hidden = false;
+  $('#access-code').focus();
+}
+
+$('#access-form').onsubmit = async event => {
+  event.preventDefault();
+  const button = $('#access-form button');
+  button.disabled = true;
+  $('#access-error').hidden = true;
+  try {
+    const response = await fetch('/api/access', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({code: $('#access-code').value})});
+    if (!response.ok) throw Error((await response.json()).detail);
+    location.reload();
+  } catch (error) {
+    Object.assign($('#access-error'), {textContent: error.message, hidden: false});
+  } finally {
+    button.disabled = false;
+  }
+};
 
 function notify(text, error = false) {
   clearTimeout(noticeTimer);
@@ -410,7 +432,7 @@ function onLiveEvent(event) {
       notify('Call ended. Its transcript and ticket are saved.');
       break;
     case 'closed':
-      if (live) { stopLive(); notify('The live connection closed. Reopen the call to continue.', true); }
+      if (live) { stopLive(); notify(event.reason || 'The live connection closed. Reopen the call to continue.', true); }
       break;
   }
 }
@@ -567,6 +589,8 @@ $('#record-requirements').onclick = () => action(() => toggleRecording('#require
 
 // ------------------------------------------------------------------ boot
 action(async () => {
+  const access = await (await fetch('/api/access')).json();
+  if (access.required && !access.granted) { showAccessGate(); return; }
   [health, voices] = await Promise.all([api('/health'), api('/voices')]);
   fillVoiceOptions();
   await Promise.all([refreshBusiness(), refreshCalls()]);

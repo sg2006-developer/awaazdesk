@@ -2,6 +2,8 @@
 
 **A multilingual voice support agent that any small business can configure in minutes, built on Gnani's Indian-language speech stack.**
 
+📄 **[One-page solution pitch](PITCH.md)**
+
 A business owner describes their services, rules and FAQs. A caller then just *talks* in English, Hindi,
 Telugu, Tamil or any of ten Indian languages (or mixes them). AwaazDesk listens with **Gnani Prisma v3.0**,
 reasons over the business's approved knowledge with an LLM, answers aloud in the caller's language with
@@ -126,10 +128,32 @@ DATABASE_URL=sqlite:///./data/awaazdesk.db
 Without an LLM key the app runs in a clearly labelled *limited local* mode (keyword lookup, no
 reasoning). A configured provider failing is reported, never silently replaced with a fake answer.
 
+## Host it (Render, free tier)
+
+The repo includes a `Dockerfile` and a `render.yaml` Blueprint.
+
+1. Sign in at [render.com](https://render.com) with GitHub, then **New → Blueprint** and pick this repository.
+2. Fill in the three secrets it asks for: `GNANI_API_KEY`, `OPENROUTER_API_KEY` and a `DEMO_ACCESS_CODE` of your choice.
+3. Deploy. Open `https://<service>.onrender.com`, enter the access code, publish the sample business and call.
+
+A public URL could spend your credits, so the hosted demo is protected by:
+
+| Protection | Default (env var) |
+| --- | --- |
+| Access code, then a signed `HttpOnly` session cookie (HTTP and WebSocket) | `DEMO_ACCESS_CODE` |
+| New calls per visitor | 10 per hour (`CALLS_PER_HOUR_PER_VISITOR`) |
+| Speech requests per visitor | 20 per minute (`SPEECH_REQUESTS_PER_MINUTE`) |
+| Calls / LLM turns per day, all visitors | 150 / 800 (`DAILY_CALL_LIMIT`, `DAILY_LLM_LIMIT`) |
+| Simultaneous live calls, max call length | 4, 5 minutes (`MAX_LIVE_CALLS`, `MAX_CALL_SECONDS`) |
+
+Render's free tier sleeps after 15 idle minutes (first visit then takes ~50 s), and its disk is ephemeral, so
+the demo resets to the sample business on each restart. Everything a visitor creates is visible to other
+visitors with the code, so keep the data synthetic.
+
 ## Tests
 
 ```sh
-uv run pytest -q                                  # 47 offline tests, no credits used
+uv run pytest -q                                  # 55 offline tests, no credits used
 uv run python scripts/check_reasoning.py --live   # LLM decisions in English/Hindi/Telugu
 uv run python scripts/check_voice.py --live       # full voice loop in 4 languages + latency table
 ```
@@ -161,8 +185,8 @@ plus the Gnani protocol handling, recognition hints, voice selection and HTTP ed
 - **Telephony.** This is a browser simulator. Gnani ships LiveKit and Pipecat plugins and Timbre outputs
   8 kHz µ-law directly, which is the path to a real phone number.
 - **Post-call analytics** with Gnani Batch STT (speaker separation, up to 4 h files).
-- **Single business, local only.** No authentication, multi-tenancy or rate limits. Bind to localhost and
-  use synthetic data only; `data/awaazdesk.db` holds transcripts.
+- **Single business demo.** The hosted version is protected by an access code and spend limits, not by
+  user accounts or multi-tenancy. Use synthetic data only; `data/awaazdesk.db` holds transcripts.
 
 Costs: OpenRouter billing is separate from Gnani credits. Gemini 2.5 Flash was $0.30/M input and
 $2.50/M output tokens at setup; check current pricing before heavy use.

@@ -21,8 +21,9 @@ log = logging.getLogger("awaazdesk.live")
 
 
 class LiveCall:
-    def __init__(self, ws: WebSocket, store, call_id, stt_factory=RealtimeSTT, tts_factory=RealtimeTTS):
+    def __init__(self, ws: WebSocket, store, call_id, stt_factory=RealtimeSTT, tts_factory=RealtimeTTS, guard=None, max_seconds=None):
         self.ws, self.store, self.call_id = ws, store, call_id
+        self.guard, self.max_seconds = guard, max_seconds
         self.stt_factory, self.tts_factory = stt_factory, tts_factory
         self.stt = None
         self.tts = None
@@ -33,6 +34,10 @@ class LiveCall:
         self.speech_ended_at = None
         self.stt_latency = None
         self.voice_ready = False
+
+    def _duration(self):
+        seconds = int(self.max_seconds or 0)
+        return f"{seconds // 60} minutes" if seconds >= 120 else f"{seconds} seconds"
 
     # ------------------------------------------------------------ plumbing
     async def send(self, **event):
@@ -66,7 +71,13 @@ class LiveCall:
             if len(call["messages"]) == 1:  # Fresh call: speak the greeting.
                 greeting = call["messages"][0]
                 self.speaking = asyncio.create_task(self.speak(greeting["content"], greeting.get("language", "en-IN"), config))
-            await self.read_client()
+            try:
+                async with asyncio.timeout(self.max_seconds):
+                    await self.read_client()
+            except TimeoutError:
+                call = self.store.end(self.call_id)
+                await self.send(type="error", message=f"Demo calls are limited to {self._duration()}. The transcript and ticket are saved.")
+                await self.send(type="ended", call=call)
         finally:
             for task in tasks + [self.speaking]:
                 if task and not task.done():
@@ -157,7 +168,7 @@ class LiveCall:
             await self.send(type="thinking")
             try:
                 call = self.store.call(self.call_id)
-                call = await take_turn(self.store, self.call_id, text, call["revision"], language, meta)
+                call = await take_turn(self.store, self.call_id, text, call["revision"], language, meta, guard=self.guard)
             except HTTPException as exc:
                 await self.send(type="error", message=str(exc.detail))
                 continue

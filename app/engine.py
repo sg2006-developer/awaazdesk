@@ -140,7 +140,7 @@ async def respond(config, messages, previous, caller_language=None):
     return decision, ticket
 
 
-async def take_turn(store, call_id, text, revision, caller_language=None, stt_meta=None):
+async def take_turn(store, call_id, text, revision, caller_language=None, stt_meta=None, guard=None):
     """Run one customer turn and persist it. Shared by typed and live voice calls."""
     call = store.call(call_id)
     if not call:
@@ -149,6 +149,8 @@ async def take_turn(store, call_id, text, revision, caller_language=None, stt_me
         raise HTTPException(409, "Conversation ended or changed. Reload it before retrying.")
     if len(call["messages"]) > 80:
         raise HTTPException(422, "This test call reached its 40-turn limit. End it and start a new call.")
+    if guard is not None and llm_ready():
+        guard.reasoning()
     config = store.version(call["version"])["config"]
     user = {"role": "user", "content": text}
     if caller_language:
