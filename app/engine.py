@@ -64,6 +64,15 @@ def reply_problems(decision, caller_language):
     return problems
 
 
+def strip_claims(text):
+    """Last resort: drop the sentences that make a forbidden claim, if anything is left."""
+    if not text:
+        return text
+    sentences = re.split(r"(?<=[.!?।])\s+", text.strip())
+    kept = [x for x in sentences if not FORBIDDEN_CLAIMS.search(x)]
+    return " ".join(kept) if kept else text
+
+
 def tokens(text):
     return set(re.findall(r"\w+", text.casefold())) - {"the", "a", "an", "is", "my", "i", "to", "for", "what", "me", "you", "and", "of", "it"}
 
@@ -170,6 +179,9 @@ async def respond(config, messages, previous, caller_language=None):
             retry = await decide(system + " CORRECTION: " + " Also, ".join(problems) + ".", payload)
             if len(reply_problems(retry, caller_language)) < len(problems):
                 decision = retry
+            if FORBIDDEN_CLAIMS.search(f"{decision.reply} {decision.spoken_reply or ''}"):
+                decision.reply = strip_claims(decision.reply)
+                decision.spoken_reply = strip_claims(decision.spoken_reply)
         engine = "hosted-llm"
     allowed = {c["name"] for c in config["categories"]}
     if decision.category not in allowed:

@@ -430,3 +430,17 @@ def test_typed_turn_gets_language_hint_from_its_script(tmp_path, monkeypatch, bu
         client.post(f"/api/calls/{call['id']}/turn", json={"text": "టెక్నీషియన్ రాలేదు", "revision": 1})
     assert hints[0] == "en-IN" and hints[1] == "te-IN"
     store.engine.dispose()
+
+
+def test_claim_is_stripped_when_retry_repeats_it(monkeypatch, business):
+    reply = "Of course, I've flagged your request in the dashboard for a staff member to review. They will be able to assist you further."
+    calls = []
+
+    async def reason(system, payload):
+        calls.append(1)
+        return {"reply": reply, "spoken_reply": reply, "language": "en-IN", "category": "Installation", "status": "needs_human",
+                "summary": "s", "fields": {}, "source_ids": []}
+    monkeypatch.setattr(engine, "reason", reason)
+    decision, _ = asyncio.run(engine.respond(business, [{"role": "user", "content": "Can I talk to a person?"}], {}, caller_language="en-IN"))
+    assert len(calls) == 2
+    assert decision.reply == decision.spoken_reply == "Of course, I've flagged your request in the dashboard for a staff member to review."
